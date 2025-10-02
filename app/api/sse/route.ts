@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
             await pushEvent('highlight', { title: 'Nice Trade', message: `${summoner} won a skirmish` })
           }
           const nowInGame = !!res.data
+          const currentGameId: number | null = res?.data?.gameId ?? null
 
           // Transition detection: in-game -> not-in-game (game ended)
           if (lastInGame && !nowInGame) {
@@ -77,6 +78,11 @@ export async function GET(req: NextRequest) {
             }, 20000)
           }
 
+          // New game detection: gameId changed while in-game
+          if (nowInGame && currentGameId && currentGameId !== lastGameId) {
+            await pushEvent('newGame', { gameId: currentGameId })
+          }
+
           // Regular idle stats update on cooldown
           if ((!nowInGame || res.status === 404) && (Date.now() - lastStatsAt > STATS_COOLDOWN_MS)) {
             try {
@@ -88,7 +94,7 @@ export async function GET(req: NextRequest) {
 
           // Track last state for next tick
           lastInGame = nowInGame
-          lastGameId = res?.data?.gameId ?? null
+          lastGameId = currentGameId
 
           // Adaptive scheduling
           if (res.status === 429) {

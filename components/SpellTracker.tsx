@@ -23,7 +23,7 @@ function TeamColumn({ team, players }: { team: 'BLUE'|'RED', players: any[] }) {
   return (
     <div className="flex flex-col gap-2">
       {players.map((p, i) => (
-        <motion.div layout key={i} className="flex items-center gap-2">
+        <motion.div layout key={`${p?.summonerName || team}-${p?.championId || i}`} className="flex items-center gap-2">
           {/* tiny champ portrait */}
           <Image src={championSquare(p?.championId)} alt="champ" width={20} height={20} className="rounded" />
           {/* small label */}

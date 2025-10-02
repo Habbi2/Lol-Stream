@@ -26,13 +26,6 @@ Add that URL to OBS as a Browser Source.
 - Scoreboard, spell tracker, and highlight popups
 - Clean neon glassmorphism theme
 
-### Live Client Data mode (no API key)
-When running locally in OBS, you can read data directly from the LoL client:
-
-- Use: `http://localhost:3000?mode=liveclient` (optionally add `summoner`/`region` for UI labeling only).
-- This pulls from `http://127.0.0.1:2999/liveclientdata/allgamedata` and powers the overlay without a Riot API key.
-- Note: This endpoint is only available on your PC while the client is running; remote deployments cannot access it due to CORS.
-
 ## Deploy
 - Push to GitHub and import in Vercel
 - Add environment variable `RIOT_API_KEY`

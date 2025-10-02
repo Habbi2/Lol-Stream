@@ -61,6 +61,11 @@ export default function Home() {
           setLastStatus(data?.payload?.status ?? null)
           setLastMessage(data?.payload?.message ?? null)
           if (data?.payload?.data) setStats(null)
+        } else if (data?.type === 'newGame') {
+          // Reset per-game UI state when a new game starts
+          setStats(null)
+          setEvents((prev) => [data, ...prev].slice(0, 50))
+          return
         } else if (data?.type === 'config') {
           if (data?.payload) setConfigInfo(data.payload)
         } else if (data?.type === 'stats') {
@@ -123,6 +128,17 @@ export default function Home() {
   }
 
   const latest = events.find((e) => e.type === 'activeGame')
+  const activeGameData = latest?.payload?.data ?? null
+  const activeGameId = activeGameData?.gameId ?? null
+  const activeGameKey = useMemo(() => {
+    if (!activeGameData) return null
+    if (activeGameId) return String(activeGameId)
+    const parts = (activeGameData.participants || [])
+      .map((p: any) => `${p?.summonerName || ''}-${p?.championId || ''}`)
+      .sort()
+      .join('|')
+    return `${activeGameData.mapId || 0}-${(activeGameData.gameMode || '').toUpperCase()}-${parts}`
+  }, [activeGameData, activeGameId])
 
   return (
     <div className="w-screen h-screen relative">
@@ -143,13 +159,14 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {latest?.payload?.data ? (
+      {activeGameData ? (
         <>
           <div className="absolute top-4 left-1/2 -translate-x-1/2">
-            <Scoreboard data={latest?.payload?.data ?? null} />
+            {/* Key by game identity to force a clean remount when a new game starts */}
+            <Scoreboard key={activeGameKey || 'nogame'} data={activeGameData} />
           </div>
           <div className="absolute left-4 top-1/2 -translate-y-1/2">
-            <SpellTracker data={latest?.payload?.data ?? null} />
+            <SpellTracker key={`spells-${activeGameKey || 'nogame'}`} data={activeGameData} />
           </div>
         </>
       ) : (
