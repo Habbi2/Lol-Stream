@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --overlay-glow: 0 0 16px rgba(0,231,255,0.35);
+}
+
+body {
+  background: radial-gradient(1200px 600px at 50% 0%, rgba(154,123,255,0.18), rgba(0,0,0,0)) no-repeat,
+              radial-gradient(900px 400px at 10% 100%, rgba(0,231,255,0.12), rgba(0,0,0,0)) no-repeat,
+              #000;
+}
+
+html, body { margin: 0; }
+
+/* OBS transparent mode: apply to <html> to remove any page background */
+html.obs-transparent, html.obs-transparent body {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.glass {
+  @apply bg-white/5 backdrop-blur-md border border-white/10 shadow-lg;
+}
+
+/* When running with ?transparent=1 in OBS, avoid dark halo from drop shadows */
+html.obs-transparent .glass {
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  /* Use a solid semi-transparent fill instead of blur so edges don't sample black */
+  background: rgba(17, 24, 39, 0.9) !important; /* ~bg-zinc-900/60 */
+  border-color: rgba(255, 255, 255, 0.315) !important;
+}
+
+.text-glow-primary {
+  text-shadow: 0 0 8px rgba(0,231,255,0.6);
+}

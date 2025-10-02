@@ -1,0 +1,6 @@
+{
+  "framework": "nextjs",
+  "routes": [
+    { "src": "/api/sse", "dest": "/api/sse" }
+  ]
+}
