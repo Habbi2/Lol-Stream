@@ -34,6 +34,9 @@ export async function GET(req: NextRequest) {
       const MAX_BACKOFF_MS = 120000
       const STATS_COOLDOWN_MS = 60000
       let lastStatsAt = 0
+  let lastInGame = false
+  let lastGameId: number | null = null
+  let statsRetryTimer: any = null
 
       function jitter(n: number) { return Math.max(0, Math.floor(n + (Math.random() * 0.15 - 0.05) * n)) }
       function scheduleNext(ms: number) {
@@ -53,14 +56,39 @@ export async function GET(req: NextRequest) {
           if (res.data && Math.random() < 0.25) {
             await pushEvent('highlight', { title: 'Nice Trade', message: `${summoner} won a skirmish` })
           }
-          // When not in game, emit stats on a cooldown so we don't spam
-          if ((!res.data || res.status === 404) && (Date.now() - lastStatsAt > STATS_COOLDOWN_MS)) {
+          const nowInGame = !!res.data
+
+          // Transition detection: in-game -> not-in-game (game ended)
+          if (lastInGame && !nowInGame) {
+            try {
+              const stats = await getSummonerStats(region, summoner, riotKey)
+              await pushEvent('stats', stats)
+              lastStatsAt = Date.now()
+            } catch {}
+            // Schedule a single retry to catch Match-V5 indexing delay (e.g., 20s later)
+            if (statsRetryTimer) clearTimeout(statsRetryTimer)
+            statsRetryTimer = setTimeout(async () => {
+              if (stopped) return
+              try {
+                const stats2 = await getSummonerStats(region, summoner, riotKey)
+                await pushEvent('stats', stats2)
+                lastStatsAt = Date.now()
+              } catch {}
+            }, 20000)
+          }
+
+          // Regular idle stats update on cooldown
+          if ((!nowInGame || res.status === 404) && (Date.now() - lastStatsAt > STATS_COOLDOWN_MS)) {
             try {
               const stats = await getSummonerStats(region, summoner, riotKey)
               await pushEvent('stats', stats)
               lastStatsAt = Date.now()
             } catch {}
           }
+
+          // Track last state for next tick
+          lastInGame = nowInGame
+          lastGameId = res?.data?.gameId ?? null
 
           // Adaptive scheduling
           if (res.status === 429) {
@@ -97,6 +125,7 @@ export async function GET(req: NextRequest) {
         clearInterval(keepAlive)
         stopped = true
         if (pollTimer) clearTimeout(pollTimer)
+        if (statsRetryTimer) clearTimeout(statsRetryTimer)
         controller.close()
       }
 
