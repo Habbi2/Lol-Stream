@@ -163,10 +163,10 @@ export default function Home() {
         <>
           <div className="absolute top-4 left-1/2 -translate-x-1/2">
             {/* Key by game identity to force a clean remount when a new game starts */}
-            <Scoreboard key={activeGameKey || 'nogame'} data={activeGameData} />
+            <Scoreboard key={activeGameKey || 'nogame'} data={activeGameData} gameKey={activeGameKey || undefined} />
           </div>
           <div className="absolute left-4 top-1/2 -translate-y-1/2">
-            <SpellTracker key={`spells-${activeGameKey || 'nogame'}`} data={activeGameData} />
+            <SpellTracker key={`spells-${activeGameKey || 'nogame'}`} data={activeGameData} gameKey={activeGameKey || undefined} />
           </div>
         </>
       ) : (
