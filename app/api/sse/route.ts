@@ -53,9 +53,6 @@ export async function GET(req: NextRequest) {
           const res = await getActiveGame(region, summoner, riotKey)
 
           await pushEvent('activeGame', res)
-          if (res.data && Math.random() < 0.25) {
-            await pushEvent('highlight', { title: 'Nice Trade', message: `${summoner} won a skirmish` })
-          }
           const nowInGame = !!res.data
           const currentGameId: number | null = res?.data?.gameId ?? null
 

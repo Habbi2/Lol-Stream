@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { normalizeRegion } from '@/lib/riot'
 import Scoreboard from '@/components/Scoreboard'
 import SpellTracker from '@/components/SpellTracker'
-import HighlightPopups from '@/components/HighlightPopups'
 import VoteWidget from '@/components/VoteWidget'
 import ObsControls from '@/components/ObsControls'
 import StatsPanel from '@/components/StatsPanel'
@@ -175,7 +174,7 @@ export default function Home() {
         </div>
       )}
 
-      <HighlightPopups events={events.filter((e) => e.type === 'highlight')} />
+  {/* Highlights removed */}
       <ObsControls />
 
       {/* Optional debug controls - only render after mount to avoid hydration mismatches */}
