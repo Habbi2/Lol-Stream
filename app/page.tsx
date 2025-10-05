@@ -22,64 +22,66 @@ export default function Home() {
   const sseRef = useRef<EventSource | null>(null)
   const [connKey, setConnKey] = useState<string>("init")
 
-  // Helper to (re)connect SSE based on current URL or provided params via connKey
+  // SSE connection effect: reconnect on connKey changes to fully reset between games
   useEffect(() => {
     if (typeof window === 'undefined') return
+    // Build endpoint from URL params
     const url = new URL(window.location.href)
-  const defaultSummoner = (process.env.NEXT_PUBLIC_DEFAULT_PUUID || process.env.DEFAULT_PUUID || process.env.NEXT_PUBLIC_DEFAULT_SUMMONER || '') as string
+    const defaultSummoner = (process.env.NEXT_PUBLIC_DEFAULT_PUUID || process.env.DEFAULT_PUUID || process.env.NEXT_PUBLIC_DEFAULT_SUMMONER || '') as string
     const defaultRegion = process.env.NEXT_PUBLIC_DEFAULT_REGION || 'na1'
     const qsSummoner = url.searchParams.get('summoner') || defaultSummoner
     const qsRegionRaw = url.searchParams.get('region') || defaultRegion
     const qsRegion = normalizeRegion(qsRegionRaw)
     const mode = url.searchParams.get('mode') || ''
 
-    // Close previous connection if any
+    // Clean up old connection
     if (sseRef.current) {
       try { sseRef.current.close() } catch {}
       sseRef.current = null
     }
 
+    // Start new SSE
     const endpoint = mode === 'liveclient'
       ? `/api/liveclient`
       : `/api/sse?region=${qsRegion}${qsSummoner ? `&summoner=${encodeURIComponent(qsSummoner)}` : ''}`
-    const sse = new EventSource(endpoint)
-    sseRef.current = sse
+    const source = new EventSource(endpoint)
+    sseRef.current = source
+
+    // Reset UI state on new connection
     setConnected(false)
     setEvents([])
     setLastStatus(null)
     setLastMessage(null)
     setConfigInfo(null)
 
-    sse.onopen = () => setConnected(true)
-    sse.onerror = () => setConnected(false)
+    source.onopen = () => setConnected(true)
+    source.onerror = () => setConnected(false)
 
-    sse.onmessage = (e) => {
+    source.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data)
-        if (data?.type === 'activeGame') {
-          setLastStatus(data?.payload?.status ?? null)
-          setLastMessage(data?.payload?.message ?? null)
-          if (data?.payload?.data) setStats(null)
-        } else if (data?.type === 'newGame') {
-          // Reset per-game UI state when a new game starts
-          setStats(null)
-          setEvents((prev) => [data, ...prev].slice(0, 50))
+        if (data.type === 'newGame') {
+          // full reset by bumping key
+          setConnKey(`${Date.now()}`)
           return
-        } else if (data?.type === 'config') {
-          if (data?.payload) setConfigInfo(data.payload)
-        } else if (data?.type === 'stats') {
-          if (data?.payload?.data) setStats(data.payload.data)
+        }
+        if (data.type === 'activeGame') {
+          setLastStatus(data.payload.status ?? null)
+          setLastMessage(data.payload.message ?? null)
+          if (data.payload.data) setStats(null)
+        } else if (data.type === 'config') {
+          setConfigInfo(data.payload)
+        } else if (data.type === 'stats') {
+          if (data.payload.data) setStats(data.payload.data)
         }
         setEvents((prev) => [data, ...prev].slice(0, 50))
       } catch {}
     }
 
     return () => {
-      try { sse.close() } catch {}
+      try { source.close() } catch {}
     }
-  // Reconnect when connKey changes (manual trigger) or URL changes (e.g., user edits query)
   }, [connKey])
-
   // Debug panel state
   useEffect(() => {
     setMounted(true)
@@ -138,6 +140,22 @@ export default function Home() {
       .join('|')
     return `${activeGameData.mapId || 0}-${(activeGameData.gameMode || '').toUpperCase()}-${parts}`
   }, [activeGameData, activeGameId])
+
+  // Track previous game key to detect game transitions client-side
+  const prevGameKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (prevGameKeyRef.current && activeGameKey && activeGameKey !== prevGameKeyRef.current) {
+      // Reset UI state and reconnect SSE when a new game key is detected
+      setStats(null)
+      setEvents([])
+      setLastStatus(null)
+      setLastMessage(null)
+      setConfigInfo(null)
+      try { sseRef.current?.close() } catch {}
+      setConnKey(`${Date.now()}`)
+    }
+    prevGameKeyRef.current = activeGameKey
+  }, [activeGameKey])
 
   return (
     <div className="w-screen h-screen relative">
