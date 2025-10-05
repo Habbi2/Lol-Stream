@@ -22,42 +22,39 @@ export default function Home() {
   const sseRef = useRef<EventSource | null>(null)
   const [connKey, setConnKey] = useState<string>("init")
 
-  // SSE connection effect: reconnect on connKey changes to fully reset between games
+  // SSE connection effect: reconnect on connKey changes or URL updates
   useEffect(() => {
     if (typeof window === 'undefined') return
-    // Build endpoint from URL params
-    const url = new URL(window.location.href)
-    const defaultSummoner = (process.env.NEXT_PUBLIC_DEFAULT_PUUID || process.env.DEFAULT_PUUID || process.env.NEXT_PUBLIC_DEFAULT_SUMMONER || '') as string
-    const defaultRegion = process.env.NEXT_PUBLIC_DEFAULT_REGION || 'na1'
-    const qsSummoner = url.searchParams.get('summoner') || defaultSummoner
-    const qsRegionRaw = url.searchParams.get('region') || defaultRegion
-    const qsRegion = normalizeRegion(qsRegionRaw)
-    const mode = url.searchParams.get('mode') || ''
+    // Build SSE endpoint
+    const u = new URL(window.location.href)
+    const defSum = (process.env.NEXT_PUBLIC_DEFAULT_PUUID || process.env.DEFAULT_PUUID || process.env.NEXT_PUBLIC_DEFAULT_SUMMONER || '') as string
+    const defReg = process.env.NEXT_PUBLIC_DEFAULT_REGION || 'na1'
+    const sum = u.searchParams.get('summoner') || defSum
+    const regRaw = u.searchParams.get('region') || defReg
+    const reg = normalizeRegion(regRaw)
+    const ep = u.searchParams.get('mode') === 'liveclient'
+      ? '/api/liveclient'
+      : `/api/sse?region=${reg}${sum ? `&summoner=${encodeURIComponent(sum)}` : ''}`
 
-    // Clean up old connection
+    // Clean up previous stream
     if (sseRef.current) {
       try { sseRef.current.close() } catch {}
       sseRef.current = null
     }
 
-    // Start new SSE
-    const endpoint = mode === 'liveclient'
-      ? `/api/liveclient`
-      : `/api/sse?region=${qsRegion}${qsSummoner ? `&summoner=${encodeURIComponent(qsSummoner)}` : ''}`
-    const source = new EventSource(endpoint)
-    sseRef.current = source
-
-    // Reset UI state on new connection
+    const stream = new EventSource(ep)
+    sseRef.current = stream
+    // Reset UI on (re)connect
     setConnected(false)
     setEvents([])
     setLastStatus(null)
     setLastMessage(null)
     setConfigInfo(null)
 
-    source.onopen = () => setConnected(true)
-    source.onerror = () => setConnected(false)
+    stream.onopen = () => setConnected(true)
+    stream.onerror = () => setConnected(false)
 
-    source.onmessage = (e) => {
+    stream.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data)
         if (data.type === 'newGame') {
@@ -74,14 +71,15 @@ export default function Home() {
         } else if (data.type === 'stats') {
           if (data.payload.data) setStats(data.payload.data)
         }
-        setEvents((prev) => [data, ...prev].slice(0, 50))
+        setEvents(prev => [data, ...prev].slice(0, 50))
       } catch {}
     }
 
     return () => {
-      try { source.close() } catch {}
+      try { stream.close() } catch {}
     }
   }, [connKey])
+
   // Debug panel state
   useEffect(() => {
     setMounted(true)
@@ -141,21 +139,6 @@ export default function Home() {
     return `${activeGameData.mapId || 0}-${(activeGameData.gameMode || '').toUpperCase()}-${parts}`
   }, [activeGameData, activeGameId])
 
-  // Track previous game key to detect game transitions client-side
-  const prevGameKeyRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (prevGameKeyRef.current && activeGameKey && activeGameKey !== prevGameKeyRef.current) {
-      // Reset UI state and reconnect SSE when a new game key is detected
-      setStats(null)
-      setEvents([])
-      setLastStatus(null)
-      setLastMessage(null)
-      setConfigInfo(null)
-      try { sseRef.current?.close() } catch {}
-      setConnKey(`${Date.now()}`)
-    }
-    prevGameKeyRef.current = activeGameKey
-  }, [activeGameKey])
 
   return (
     <div className="w-screen h-screen relative">
